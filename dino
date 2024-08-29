@@ -1,0 +1,70 @@
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let dino = {
+    x: 50,
+    y: 100,
+    width: 20,
+    height: 20,
+    dy: 0,
+    gravity: 0.6,
+    jumpPower: -12,
+    grounded: true
+};
+
+function gameLoop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Dino physics
+    if (!dino.grounded) {
+        dino.dy += dino.gravity;
+        dino.y += dino.dy;
+        if (dino.y >= 100) {
+            dino.y = 100;
+            dino.grounded = true;
+            dino.dy = 0;
+        }
+    }
+
+    // Draw Dino
+    ctx.fillStyle = 'green';
+    ctx.fillRect(dino.x, dino.y, dino.width, dino.height);
+
+    requestAnimationFrame(gameLoop);
+}
+
+// Setup Audio Context
+let audioContext = new (window.AudioContext || window.webkitAudioContext)();
+let analyser = audioContext.createAnalyser();
+analyser.fftSize = 2048;
+let dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+navigator.mediaDevices.getUserMedia({ audio: true })
+    .then(stream => {
+        let source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+        gameLoop();
+    });
+
+function getAverageFrequency() {
+    analyser.getByteFrequencyData(dataArray);
+    let sum = dataArray.reduce((a, b) => a + b, 0);
+    return sum / dataArray.length;
+}
+
+function checkVoiceCommand() {
+    let frequency = getAverageFrequency();
+    if (frequency > 1000) {
+        if (dino.grounded) {
+            dino.dy = dino.jumpPower;
+            dino.grounded = false;
+        }
+    } else if (frequency < 500) {
+        if (!dino.grounded) {
+            dino.y += 10; // Quick descent
+        }
+    }
+}
+
+// Start checking voice commands
+setInterval(checkVoiceCommand, 100);
